@@ -18,6 +18,11 @@ export default function Home() {
   const wallet = useAnchorWallet();
   const mounted = useIsMounted();
 
+  const print = () => {
+    console.log("printing key")
+    console.log(wallet?.publicKey)
+  }
+
   return (
     <div className={styles.container}>
       <div className={styles.navbar}>{mounted && <WalletMultiButton />}</div>
@@ -27,6 +32,8 @@ export default function Home() {
           Your First Solana Program with{" "}
           <a href="https://alchemy.com/solana/?a=d0c917f7ef">Alchemy</a>!
         </h1>
+
+        <button onClick={print}>CLICK</button>
 
         {wallet && (
           <div className={styles.message_bar}>

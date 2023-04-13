@@ -22,6 +22,6 @@
     "react": "18.2.0",
     "react-dom": "18.2.0",
     "typescript": "4.8.4",
-    "dwallet": "git+ssh://git@github.com:Domino-Blockchain/wallet-adapter.git#tmp"
+    "dwallet": "git+ssh://git@github.com:Domino-Blockchain/wallet-adapter.git"
   }
 }

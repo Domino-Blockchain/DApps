@@ -29,8 +29,8 @@ export default function Home() {
 
       <div className={styles.main}>
         <h1 className={styles.title}>
-          Your First Solana Program with{" "}
-          <a href="https://alchemy.com/solana/?a=d0c917f7ef">Alchemy</a>!
+          Your First Domichain Project Program with{" "}
+          <a href="https://alchemy.com/">Alchemy</a>!
         </h1>
 
         <button onClick={print}>CLICK</button>

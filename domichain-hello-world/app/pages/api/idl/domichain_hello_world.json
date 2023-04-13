@@ -1,6 +1,6 @@
 {
   "version": "0.1.0",
-  "name": "solana_hello_world",
+  "name": "domichain_hello_world",
   "instructions": [
     {
       "name": "createMessage",

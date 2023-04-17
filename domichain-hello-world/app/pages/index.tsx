@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Keypair } from "@solana/web3.js";
 import { useAnchorWallet } from "@solana/wallet-adapter-react";
 import { WalletMultiButton } from "@solana/wallet-adapter-react-ui";
@@ -18,10 +18,6 @@ export default function Home() {
   const wallet = useAnchorWallet();
   const mounted = useIsMounted();
 
-  const print = () => {
-    console.log("printing key")
-    console.log(wallet?.publicKey)
-  }
 
   return (
     <div className={styles.container}>
@@ -32,8 +28,6 @@ export default function Home() {
           Your First Domichain Project Program with{" "}
           <a href="https://alchemy.com/">Alchemy</a>!
         </h1>
-
-        <button onClick={print}>CLICK</button>
 
         {wallet && (
           <div className={styles.message_bar}>

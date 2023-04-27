@@ -1,5 +1,5 @@
 import { Program, AnchorProvider, web3 } from "@project-serum/anchor";
-import { SolanaHelloWorld } from "./types/solana_hello_world";
+import { DomichainHelloWorld } from "./types/domichain_hello_world";
 import {
   connection,
   commitmentLevel,
@@ -24,7 +24,7 @@ export default async function createMessage(
     helloWorldprogramInterface,
     helloWorldprogramId,
     provider
-  ) as Program<SolanaHelloWorld>;
+  ) as Program<DomichainHelloWorld>;
 
   try {
     /* interact with the program via rpc */

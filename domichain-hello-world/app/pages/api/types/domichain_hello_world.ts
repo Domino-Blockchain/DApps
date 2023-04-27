@@ -1,6 +1,6 @@
-export type SolanaHelloWorld = {
+export type DomichainHelloWorld = {
   "version": "0.1.0",
-  "name": "solana_hello_world",
+  "name": "domichain_hello_world",
   "instructions": [
     {
       "name": "createMessage",
@@ -79,9 +79,9 @@ export type SolanaHelloWorld = {
   ]
 };
 
-export const IDL: SolanaHelloWorld = {
+export const IDL: DomichainHelloWorld = {
   "version": "0.1.0",
-  "name": "solana_hello_world",
+  "name": "domichain_hello_world",
   "instructions": [
     {
       "name": "createMessage",

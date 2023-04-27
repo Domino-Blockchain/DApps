@@ -1,7 +1,7 @@
-import idl from "../idl/solana_hello_world.json";
+import idl from "../idl/domichain_hello_world.json";
 import { Connection, PublicKey, clusterApiUrl } from "@solana/web3.js";
 
-/* Constants for RPC Connection the Solana Blockchain */
+/* Constants for RPC Connection the Domichain Blockchain */
 export const commitmentLevel = "processed";
 export const endpoint =
   process.env.NEXT_PUBLIC_ALCHEMY_RPC_URL || clusterApiUrl("devnet");

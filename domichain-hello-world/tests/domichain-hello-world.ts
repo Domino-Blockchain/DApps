@@ -1,14 +1,14 @@
 import * as anchor from "@project-serum/anchor";
 import { Program } from "@project-serum/anchor";
-import { SolanaHelloWorld } from "../target/types/solana_hello_world";
+import { DomichainHelloWorld } from "../target/types/domichain_hello_world";
 import * as assert from "assert";
 
-describe("solana-hello-world", () => {
+describe("domichain-hello-world", () => {
   const provider = anchor.AnchorProvider.env();
   anchor.setProvider(provider);
 
   const program = anchor.workspace
-    .SolanaHelloWorld as Program<SolanaHelloWorld>;
+    .DomichainHelloWorld as Program<DomichainHelloWorld>;
 
   it("Can create a message", async () => {
     const message = anchor.web3.Keypair.generate();
@@ -46,7 +46,7 @@ describe("solana-hello-world", () => {
       signers: [message],
     });
 
-    const updatedMessageContent = "Solana is cool!";
+    const updatedMessageContent = "Domichain is cool!";
     await program.rpc.updateMessage(updatedMessageContent, {
       accounts: {
         message: message.publicKey,

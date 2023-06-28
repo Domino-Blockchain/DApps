@@ -9,11 +9,13 @@ export default function Page() {
   const [greetingCount, setGreetingCount] = useState(0);
   const [loading, setLoading] = useState(false);
 
-  const { wallet } = useWallet();
+  const { wallet, sendTransaction } = useWallet();
   const mounted = useIsMounted();
 
+  const walletIsConnected = wallet?.adapter?.connected;
+
   const updateGreetingCount = useCallback(async () => {
-    if (wallet?.adapter?.connected) {
+    if (walletIsConnected) {
       try {
         const newGreetingsCount = await reportGreetings(wallet);
         setGreetingCount(newGreetingsCount);
@@ -21,15 +23,15 @@ export default function Page() {
         console.error(error);
       }
     }
-  }, [wallet?.adapter?.connected]);
+  }, [walletIsConnected]);
 
   const handleOnClick = async () => {
-    if (!wallet?.adapter?.connected) {
+    if (!walletIsConnected) {
       return;
     }
     setLoading(true);
     try {
-      await sendGreeting(wallet);
+      await sendGreeting(wallet, sendTransaction);
       await updateGreetingCount();
     } catch (error) {
       console.error(error);
@@ -47,12 +49,16 @@ export default function Page() {
       <div className={styles.navbar}>{mounted && <WalletMultiButton />}</div>
 
       <div className={styles.main}>
-        <h1 className={styles.title}>You've got {greetingCount} greetings!</h1>
+        <h1 className={styles.title}>
+          {walletIsConnected
+            ? `This account has been greeted ${greetingCount} times`
+            : "Please connect your wallet to proceed"}
+        </h1>
 
-        {wallet?.adapter?.connected && (
+        {walletIsConnected && (
           <div className={styles.message_bar}>
             <button className={styles.message_button} onClick={handleOnClick}>
-              Increase that count
+              Say hello
             </button>
           </div>
         )}

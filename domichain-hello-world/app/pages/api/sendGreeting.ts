@@ -1,3 +1,4 @@
+import { WalletAdapterProps } from "@solana/wallet-adapter-base";
 import { connection } from "./utils/constants";
 import { Wallet } from "@solana/wallet-adapter-react";
 import {
@@ -83,7 +84,10 @@ export async function getGreetedPubkey(wallet: Wallet): Promise<PublicKey> {
   return greetedPubkey;
 }
 
-export async function sendGreeting(wallet: Wallet) {
+export async function sendGreeting(
+  wallet: Wallet,
+  sendTransaction: WalletAdapterProps["sendTransaction"]
+) {
   const transaction = new Transaction().add(
     new TransactionInstruction({
       keys: [
@@ -97,7 +101,21 @@ export async function sendGreeting(wallet: Wallet) {
       data: Buffer.alloc(0), // All instructions are hellos
     })
   );
-  await wallet.adapter.sendTransaction(transaction, connection);
+
+  const {
+    context: { slot: minContextSlot },
+    value: { blockhash, lastValidBlockHeight },
+  } = await connection.getLatestBlockhashAndContext();
+
+  const signature = await sendTransaction(transaction, connection, {
+    minContextSlot,
+  });
+
+  await connection.confirmTransaction({
+    blockhash,
+    lastValidBlockHeight,
+    signature,
+  });
 }
 
 export async function reportGreetings(wallet: Wallet): Promise<number> {

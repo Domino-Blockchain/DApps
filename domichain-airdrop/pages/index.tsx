@@ -168,7 +168,6 @@ export default function Page() {
                           <Input
                             className="pl-6"
                             lang="en"
-                            name="usdtAmount"
                             placeholder="0.0"
                             type="number"
                             inputMode="decimal"

@@ -3,28 +3,27 @@ import "../styles/globals.css";
 import type { AppProps } from "next/app";
 import Head from "next/head";
 
-import { Web3Modal } from "@web3modal/react";
-import { WagmiConfig, configureChains, createConfig } from "wagmi";
-import { bsc, bscTestnet } from "wagmi/chains";
+import { chain } from "@/lib/chain";
+import useIsMounted from "@/lib/hooks/useIsMounted";
 import {
   EthereumClient,
   w3mConnectors,
   w3mProvider,
 } from "@web3modal/ethereum";
-import useIsMounted from "@/lib/hooks/useIsMounted";
+import { Web3Modal } from "@web3modal/react";
+import { WagmiConfig, configureChains, createConfig } from "wagmi";
 
-const chains = [bsc, bscTestnet];
 const projectId = process.env.NEXT_PUBLIC_WC_PROJECT_ID!;
 
-const { publicClient } = configureChains(chains, [w3mProvider({ projectId })]);
+const { publicClient } = configureChains([chain], [w3mProvider({ projectId })]);
 
 const wagmiConfig = createConfig({
   autoConnect: true,
-  connectors: w3mConnectors({ projectId, chains }),
+  connectors: w3mConnectors({ projectId, chains: [chain] }),
   publicClient,
 });
 
-const ethereumClient = new EthereumClient(wagmiConfig, chains);
+const ethereumClient = new EthereumClient(wagmiConfig, [chain]);
 
 function MyApp({ Component, pageProps }: AppProps) {
   const isMounted = useIsMounted();
@@ -41,8 +40,13 @@ function MyApp({ Component, pageProps }: AppProps) {
 
       <WagmiConfig config={wagmiConfig}>
         <Component {...pageProps} />
+
         {isMounted && (
-          <Web3Modal projectId={projectId} ethereumClient={ethereumClient} />
+          <Web3Modal
+            projectId={projectId}
+            ethereumClient={ethereumClient}
+            defaultChain={chain}
+          />
         )}
       </WagmiConfig>
     </>

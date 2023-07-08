@@ -3,48 +3,38 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
-  Select,
-  SelectContent,
-  SelectGroup,
-  SelectItem,
-  SelectLabel,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import {
   usdtTestnetABI,
   usdtTestnetContractAddress,
 } from "@/lib/abi/usdtTestnet";
+import { chain } from "@/lib/chain";
 import { useDebounce } from "@/lib/hooks/useDebounce";
 import useIsMounted from "@/lib/hooks/useIsMounted";
-import { cn } from "@/lib/utils";
 import { Web3Button } from "@web3modal/react";
-import { AlertCircle, CheckCircle, Loader2 } from "lucide-react";
+import { AlertCircle, CheckCircle, Loader2, Wallet } from "lucide-react";
 import { useRouter } from "next/router";
-import React, { useCallback, useEffect } from "react";
-import { Address, parseEther } from "viem";
+import React, { useEffect } from "react";
+import { parseEther } from "viem";
 import {
   useAccount,
   useContractWrite,
   useMutation,
-  useNetwork,
   usePrepareContractWrite,
-  useSwitchNetwork,
   useWaitForTransaction,
 } from "wagmi";
 
 export default function Page() {
-  const router = useRouter();
   const isMounted = useIsMounted();
-
-  const { chain, chains } = useNetwork();
-  const { isLoading: isSwitchingNetwork, switchNetwork } = useSwitchNetwork();
   const { isConnected } = useAccount();
 
   const [tokenAmount, setTokenAmount] = React.useState("");
   const debouncedTokenAmount = parseFloat(useDebounce(tokenAmount));
 
-  const { config } = usePrepareContractWrite({
+  const router = useRouter();
+  const recipientAddress = router.query["recipient"] as string;
+  const hasRecipientAddress =
+    typeof recipientAddress === "string" && recipientAddress.length >= 32;
+
+  const preparedUsdtContractWrite = usePrepareContractWrite({
     abi: usdtTestnetABI,
     address: usdtTestnetContractAddress,
     functionName: "transfer",
@@ -54,13 +44,14 @@ export default function Page() {
         ? BigInt(0)
         : parseEther(String(debouncedTokenAmount)),
     ],
+    chainId: chain.id,
     enabled: Boolean(debouncedTokenAmount),
   });
 
-  const { data, write } = useContractWrite(config);
-  const { isLoading, isSuccess } = useWaitForTransaction({ hash: data?.hash });
+  const usdtContractWrite = useContractWrite(preparedUsdtContractWrite.config);
+  const usdtTransaction = useWaitForTransaction(usdtContractWrite.data);
 
-  const { mutate } = useMutation(
+  const completeTransactionMutation = useMutation(
     async ({
       transactionHash,
       recipientAddress,
@@ -68,51 +59,56 @@ export default function Page() {
       transactionHash: string;
       recipientAddress: string;
     }) => {
-      // FIXME: remove hardcoded URL
-      return await fetch("http://192.168.0.216:8090/v1/handle", {
-        method: "POST",
-        headers: {
-          Accept: "application/json",
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          transactionHash: transactionHash,
-          recipientAddress: recipientAddress,
-        }),
-      });
+      const response = await fetch(
+        process.env.NEXT_PUBLIC_HANDLE_TRANSACTION_URL!,
+        {
+          method: "POST",
+          headers: {
+            Accept: "application/json",
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            transactionHash: transactionHash,
+            recipientAddress: recipientAddress,
+          }),
+        }
+      );
+      if (!response.ok) {
+        throw new Error(`Failed to complete transaction: ${response}`);
+      }
+      return await response.json();
     },
     {
       retry: true,
-      retryDelay: (attempt) =>
-        Math.min(attempt > 1 ? 2 ** attempt * 1000 : 1000, 30 * 1000),
+      retryDelay: 2000,
     }
   );
 
   useEffect(() => {
-    const transactionHash = data?.hash;
-    const recipientAddress = router.query["recipient"];
-
     if (
-      transactionHash &&
-      typeof recipientAddress === "string" &&
-      recipientAddress.length > 0
+      usdtTransaction.isSuccess &&
+      usdtTransaction.data &&
+      !completeTransactionMutation.isLoading
     ) {
-      mutate({
-        transactionHash,
-        recipientAddress,
+      completeTransactionMutation.mutate({
+        transactionHash: usdtTransaction.data.transactionHash,
+        recipientAddress: recipientAddress,
       });
     }
-  }, [data?.hash, isSuccess, mutate, router]);
+  }, [
+    usdtTransaction.isSuccess,
+    usdtTransaction.data,
+    recipientAddress,
+    completeTransactionMutation,
+  ]);
 
-  const handleSelectedNetwork = (value: string) => {
-    const newChain = chains.find((chain) => chain.network === value);
-    switchNetwork?.(newChain?.id);
-  };
-
-  const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
+  const handleSubmit = (event: React.FormEvent<HTMLFormElement>) => {
+    usdtContractWrite.write?.();
     event.preventDefault();
-    write?.();
   };
+
+  const isTransactionProcessing =
+    usdtTransaction.isLoading || completeTransactionMutation.isLoading;
 
   return (
     <>
@@ -125,91 +121,94 @@ export default function Page() {
           Domichain Airdrop
         </h1>
 
-        <div className="flex w-full max-w-lg">
-          {isMounted && isConnected ? (
-            <form
-              className="flex flex-col w-full space-y-4"
-              onSubmit={handleSubmit}
-            >
-              {isSuccess && (
-                <Alert className="border-green-700/50 text-green-700 [&>svg]:text-green-700 mb-8">
-                  <CheckCircle className="h-4 w-4" />
-                  <AlertTitle>Success</AlertTitle>
-                  <AlertDescription className="break-words">
-                    Transaction Hash: {data?.hash}
+        <div className="flex flex-col w-full max-w-lg space-y-8">
+          <div className="space-y-2">
+            {completeTransactionMutation.isSuccess && (
+              <Alert className="border-green-700/50 text-green-700 [&>svg]:text-green-700">
+                <CheckCircle className="h-4 w-4" />
+                <AlertTitle>Success</AlertTitle>
+                <AlertDescription>
+                  {debouncedTokenAmount} DOMI has been sent to your Domichain
+                  wallet
+                </AlertDescription>
+              </Alert>
+            )}
+
+            <Alert variant={hasRecipientAddress ? "default" : "destructive"}>
+              <Wallet className="h-4 w-4" />
+              <AlertTitle className="break-words">
+                {hasRecipientAddress
+                  ? "Airdrop Recipient Wallet"
+                  : "No Recipient Wallet Specified"}
+              </AlertTitle>
+
+              {hasRecipientAddress && (
+                <AlertDescription className="break-words">
+                  {recipientAddress}
+                </AlertDescription>
+              )}
+            </Alert>
+          </div>
+
+          {isMounted && hasRecipientAddress && (
+            <>
+              {isConnected ? (
+                <form
+                  className="flex flex-col w-full space-y-4"
+                  onSubmit={handleSubmit}
+                >
+                  <div className="flex flex-row w-full space-x-2">
+                    <div className="flex flex-col w-full space-y-2">
+                      <Label htmlFor="usdtAmount">USDT Amount</Label>
+                      <div className="relative flex items-center space-x-2">
+                        <div className="flex flex-grow">
+                          <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3">
+                            <span className="text-gray-500">$</span>
+                          </div>
+                          <Input
+                            className="pl-6"
+                            lang="en"
+                            name="usdtAmount"
+                            placeholder="0.0"
+                            type="number"
+                            inputMode="decimal"
+                            min={0.0}
+                            step={0.1}
+                            max={10000}
+                            value={tokenAmount}
+                            onChange={(event) =>
+                              setTokenAmount(event.target.value)
+                            }
+                            disabled={isTransactionProcessing}
+                          />
+                        </div>
+                      </div>
+                    </div>
+
+                    <Button
+                      className="self-end"
+                      type="submit"
+                      disabled={
+                        isTransactionProcessing || !usdtContractWrite.write
+                      }
+                    >
+                      {isTransactionProcessing && (
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      )}
+                      {isTransactionProcessing ? "Processing…" : "Transfer"}
+                    </Button>
+                  </div>
+                </form>
+              ) : (
+                <Alert variant="default">
+                  <AlertCircle className="h-4 w-4" />
+                  <AlertTitle>Ethereum Wallet is required</AlertTitle>
+                  <AlertDescription>
+                    Please connect your wallet before you proceed.
                   </AlertDescription>
                 </Alert>
               )}
-
-              <div className="flex flex-row w-full space-x-2">
-                <div className="flex flex-col w-full space-y-2">
-                  <Label htmlFor="usdtAmount">USDT Amount</Label>
-                  <div className="relative flex items-center space-x-2">
-                    <div className="flex flex-grow">
-                      <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3">
-                        <span className="text-gray-500">$</span>
-                      </div>
-                      <Input
-                        className="pl-6"
-                        lang="en"
-                        name="usdtAmount"
-                        placeholder="0.0"
-                        type="number"
-                        inputMode="decimal"
-                        min={0.0}
-                        step={0.1}
-                        max={10000}
-                        value={tokenAmount}
-                        onChange={(event) => setTokenAmount(event.target.value)}
-                      />
-                    </div>
-                  </div>
-                </div>
-
-                <div className="flex flex-col w-full space-y-2">
-                  <Label htmlFor="usdtAmount">Network</Label>
-                  <Select
-                    value={chain?.network}
-                    onValueChange={handleSelectedNetwork}
-                    disabled={isSwitchingNetwork}
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select network" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectGroup>
-                        <SelectLabel>Networks</SelectLabel>
-                        {chains.map((chain) => (
-                          <SelectItem key={chain.id} value={chain.network}>
-                            {chain.name}
-                          </SelectItem>
-                        ))}
-                      </SelectGroup>
-                    </SelectContent>
-                  </Select>
-                </div>
-              </div>
-
-              <div className="flex flex-col space-y-2">
-                <Button
-                  type="submit"
-                  disabled={debouncedTokenAmount <= 0.0 || !write || isLoading}
-                >
-                  {isLoading && (
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  )}
-                  {isLoading ? "Processing…" : "Transfer"}
-                </Button>
-              </div>
-            </form>
-          ) : (
-            <Alert variant="default">
-              <AlertCircle className="h-4 w-4" />
-              <AlertTitle>Wallet is required</AlertTitle>
-              <AlertDescription>
-                Please connect your wallet before you proceed.
-              </AlertDescription>
-            </Alert>
+            </>
           )}
         </div>
       </main>

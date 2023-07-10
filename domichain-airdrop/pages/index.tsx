@@ -91,7 +91,7 @@ export default function Page() {
     },
     {
       retry: true,
-      retryDelay: 2000,
+      retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 30000),
     }
   );
 

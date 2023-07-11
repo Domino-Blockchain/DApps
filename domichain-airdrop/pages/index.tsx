@@ -7,18 +7,25 @@ import {
   usdtTestnetContractAddress,
 } from "@/lib/abi/usdtTestnet";
 import { chain } from "@/lib/chain";
+import { useCompleteTransaction } from "@/lib/completeTransaction";
 import { useDebounce } from "@/lib/hooks/useDebounce";
 import useIsMounted from "@/lib/hooks/useIsMounted";
 import { Web3Button } from "@web3modal/react";
-import { AlertCircle, CheckCircle, Loader2, Wallet } from "lucide-react";
-import { useRouter } from "next/router";
-import React, { useEffect } from "react";
+import clsx from "clsx";
+import {
+  AlertCircle,
+  ArrowLeftRight,
+  CheckCircle,
+  Loader2,
+} from "lucide-react";
+import { queryTypes, useQueryState } from "next-usequerystate";
+import Image from "next/image";
+import React, { useState } from "react";
 import { P, match } from "ts-pattern";
 import { parseEther } from "viem";
 import {
   useAccount,
   useContractWrite,
-  useMutation,
   useNetwork,
   usePrepareContractWrite,
   useSwitchNetwork,
@@ -30,17 +37,17 @@ export default function Page() {
 
   const { isConnected } = useAccount();
   const { chain: currentChain } = useNetwork();
-  const { isLoading: isSwitching, switchNetwork } = useSwitchNetwork({
-    chainId: chain.id,
-  });
+  const { isLoading: isSwitching, switchNetwork } = useSwitchNetwork();
 
-  const [tokenAmount, setTokenAmount] = React.useState("");
+  const [tokenAmount, setTokenAmount] = useState("");
   const debouncedTokenAmount = parseFloat(useDebounce(tokenAmount));
 
-  const router = useRouter();
-  const recipientAddress = router.query["recipient"] as string;
-  const hasRecipientAddress =
-    typeof recipientAddress === "string" && recipientAddress.length >= 32;
+  const [recipientAddress, setRecipientAddress] = useQueryState(
+    "recipient",
+    queryTypes.string.withDefault("")
+  );
+  const isRecipientAddressValid =
+    isMounted && /[1-9A-HJ-NP-Za-km-z]{32,44}/.test(recipientAddress);
   // prettier-ignore
   const shortenedRecipientAddress =
     `${recipientAddress?.slice(0, 4)}...${recipientAddress?.slice(-4)}`;
@@ -60,67 +67,27 @@ export default function Page() {
   });
 
   const usdtContractWrite = useContractWrite(preparedUsdtContractWrite.config);
-  const usdtTransaction = useWaitForTransaction(usdtContractWrite.data);
+  const completeTransaction = useCompleteTransaction();
 
-  const completeTransactionMutation = useMutation(
-    async ({
-      transactionHash,
-      recipientAddress,
-    }: {
-      transactionHash: string;
-      recipientAddress: string;
-    }) => {
-      const response = await fetch(
-        process.env.NEXT_PUBLIC_HANDLE_TRANSACTION_URL!,
-        {
-          method: "POST",
-          headers: {
-            Accept: "application/json",
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            transactionHash: transactionHash,
-            recipientAddress: recipientAddress,
-          }),
-        }
-      );
-      if (!response.ok) {
-        throw new Error(`Failed to complete transaction: ${response}`);
-      }
-      return await response.json();
-    },
-    {
-      retry: true,
-      retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 30000),
-    }
-  );
-
-  useEffect(() => {
-    if (
-      usdtTransaction.isSuccess &&
-      usdtTransaction.data &&
-      !completeTransactionMutation.isLoading
-    ) {
-      completeTransactionMutation.mutate({
-        transactionHash: usdtTransaction.data.transactionHash,
+  const usdtTransaction = useWaitForTransaction({
+    hash: usdtContractWrite.data?.hash,
+    onSuccess(data) {
+      completeTransaction.mutate({
+        transactionHash: data.transactionHash,
         recipientAddress: recipientAddress,
       });
-    }
-  }, [
-    usdtTransaction.isSuccess,
-    usdtTransaction.data,
-    recipientAddress,
-    completeTransactionMutation,
-  ]);
+    },
+  });
 
   const handleSubmit = (event: React.FormEvent<HTMLFormElement>) => {
+    completeTransaction.reset();
     usdtContractWrite.write?.();
     event.preventDefault();
   };
 
   const usingCorrectChain = currentChain?.id === chain.id;
   const isTransactionProcessing =
-    usdtTransaction.isLoading || completeTransactionMutation.isLoading;
+    usdtTransaction.isLoading || completeTransaction.isLoading;
 
   return (
     <>
@@ -128,15 +95,15 @@ export default function Page() {
         <Web3Button />
       </div>
 
-      <main className="flex flex-col md:justify-center items-center min-h-screen px-8">
-        <h1 className="text-center text-3xl font-bold pt-44 md:pt-0 pb-16">
-          Domichain Airdrop
-        </h1>
+      <main className="flex flex-col md:justify-center items-center min-h-screen px-8 py-8 select-none">
+        <header className="flex flex-row justify-center items-center space-x-4 pt-32 md:pt-0 pb-12">
+          <Image alt="DAirdrop Logo" src="/logo.png" width={48} height={48} />
+          <span className="text-4xl font-bold">DAirdrop</span>
+        </header>
 
         <div className="flex flex-col w-full max-w-lg space-y-8">
-          {match([hasRecipientAddress, completeTransactionMutation.isSuccess])
-            // [hasRecipientAddress, completeTransactionMutation.isSuccess]
-            .with([true, true], () => (
+          {match([isMounted, isConnected, completeTransaction])
+            .with([true, true, { isSuccess: true }], () => (
               <Alert className="border-green-700/50 text-green-700 [&>svg]:text-green-700">
                 <CheckCircle className="h-4 w-4" />
                 <AlertTitle>Success!</AlertTitle>
@@ -144,64 +111,116 @@ export default function Page() {
                   <span className="font-semibold">
                     {debouncedTokenAmount} DOMI
                   </span>{" "}
-                  has been sent to{" "}
+                  has been successfully sent to{" "}
                   <span className="font-semibold">
                     {shortenedRecipientAddress}
                   </span>
+                  .
                 </AlertDescription>
               </Alert>
             ))
-            // [hasRecipientAddress, completeTransactionMutation.isSuccess]
-            .with([true, false], () => (
-              <Alert variant="default">
-                <Wallet className="h-4 w-4" />
-                <AlertTitle>Airdrop Recipient Wallet</AlertTitle>
-                <AlertDescription className="break-words">
-                  This airdrop will be received by{" "}
+            .with(
+              [true, true, { error: P.select(P.not(P.nullish)) }],
+              (error) => {
+                return (
+                  <Alert variant="destructive">
+                    <AlertCircle className="h-4 w-4" />
+                    <AlertTitle>An error occurred</AlertTitle>
+                    <AlertDescription>
+                      {(error as any).statusCode === 401
+                        ? "This transaction has already been completed by someone else."
+                        : "Couldn't complete the transaction."}
+                    </AlertDescription>
+                  </Alert>
+                );
+              }
+            )
+            .with([true, true, P.any], () => (
+              <Alert>
+                <AlertCircle className="h-4 w-4" />
+                <AlertTitle>What is this?</AlertTitle>
+                <AlertDescription>
+                  Send USDT to receive airdrop of DOMI token at{" "}
                   <span className="font-semibold">
                     {shortenedRecipientAddress}
-                  </span>
-                  , make sure it&apos;s yours.
+                  </span>{" "}
+                  address.
                 </AlertDescription>
               </Alert>
             ))
-            // [hasRecipientAddress, completeTransactionMutation.isSuccess]
-            .with([false, P._], () => (
-              <Alert variant="destructive">
-                <Wallet className="h-4 w-4" />
-                <AlertTitle>No Recipient Wallet Specified</AlertTitle>
-                <AlertDescription className="break-words">
-                  Try to open the Dapp again and make sure that the URL ends
-                  with{" "}
-                  <span className="font-mono bg-gray-100 rounded-sm px-1">
-                    ?/recipient=YOUR_WALLET_ADDRESS
-                  </span>
-                </AlertDescription>
-              </Alert>
-            ))
-            .exhaustive()}
+            .otherwise(() => null)}
 
-          {match([
-            isMounted,
-            hasRecipientAddress,
-            isConnected,
-            usingCorrectChain,
-          ])
-            // [isMounted, hasRecipientAddress, isConnected, usingCorrectChain]
-            .with([true, true, true, true], () => (
-              <form className="flex flex-col" onSubmit={handleSubmit}>
+          {match([isMounted, isConnected, usingCorrectChain])
+            // [isMounted, isConnected, usingCorrectChain]
+            .with([true, true, true], () => (
+              <form className="flex flex-col space-y-5" onSubmit={handleSubmit}>
+                <div className="flex flex-col w-full space-y-2">
+                  <Label
+                    htmlFor="recipientAddress"
+                    className={clsx(
+                      !isRecipientAddressValid && "text-destructive"
+                    )}
+                  >
+                    DOMI Recipient Address
+                  </Label>
+                  <div className="relative flex items-center space-x-2">
+                    <div className="flex flex-grow">
+                      <Input
+                        lang="en"
+                        name="recipientAddress"
+                        placeholder="Enter recipient address"
+                        value={recipientAddress}
+                        onChange={(event) =>
+                          setRecipientAddress(event.target.value)
+                        }
+                        disabled={isTransactionProcessing}
+                      />
+                    </div>
+                  </div>
+                  {!isRecipientAddressValid && (
+                    <span className="text-[0.8rem] font-medium text-destructive">
+                      Please enter a valid Domichain wallet address
+                    </span>
+                  )}
+                </div>
+
                 <div className="flex flex-row space-x-2">
                   <div className="flex flex-col w-full space-y-2">
-                    <Label htmlFor="usdtAmount">USDT Amount</Label>
+                    <Label htmlFor="usdtAmount">USDT</Label>
                     <div className="relative flex items-center space-x-2">
                       <div className="flex flex-grow">
                         <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3">
                           <span className="text-gray-500">$</span>
                         </div>
-
                         <Input
                           className="pl-6"
                           lang="en"
+                          name="usdtAmount"
+                          placeholder="0.0"
+                          type="number"
+                          inputMode="decimal"
+                          min={0.0}
+                          step={0.1}
+                          max={10000}
+                          value={tokenAmount}
+                          onChange={(event) =>
+                            setTokenAmount(event.target.value)
+                          }
+                          disabled={isTransactionProcessing}
+                        />
+                      </div>
+                    </div>
+                  </div>
+
+                  <ArrowLeftRight className="self-end h-10 w-10 text-gray-600" />
+
+                  <div className="flex flex-col w-full space-y-2">
+                    <Label htmlFor="domiReceived">DOMI</Label>
+                    <div className="relative flex items-center space-x-2">
+                      <div className="flex flex-grow">
+                        <Input
+                          lang="en"
+                          name="domiReceived"
                           placeholder="0.0"
                           type="number"
                           inputMode="decimal"
@@ -222,7 +241,9 @@ export default function Page() {
                     className="self-end"
                     type="submit"
                     disabled={
-                      isTransactionProcessing || !usdtContractWrite.write
+                      isTransactionProcessing ||
+                      !usdtContractWrite.write ||
+                      !isRecipientAddressValid
                     }
                   >
                     {isTransactionProcessing && (
@@ -233,18 +254,18 @@ export default function Page() {
                 </div>
               </form>
             ))
-            // [isMounted, hasRecipientAddress, isConnected, usingCorrectChain]
-            .with([true, P.boolean, true, false], () => (
+            // [isMounted, isConnected, usingCorrectChain]
+            .with([true, true, false], () => (
               <Alert variant="destructive">
                 <AlertCircle className="h-4 w-4" />
                 <AlertTitle>Unsupported Network</AlertTitle>
                 <AlertDescription>
-                  Please switch your wallet over to {chain.name}
+                  Please switch your wallet over to {chain.name}.
                 </AlertDescription>
                 <Button
                   className="mt-2"
                   variant="destructive"
-                  onClick={() => switchNetwork?.()}
+                  onClick={() => switchNetwork?.(chain.id)}
                   disabled={isSwitching}
                 >
                   {isSwitching && (
@@ -254,8 +275,8 @@ export default function Page() {
                 </Button>
               </Alert>
             ))
-            // [isMounted, hasRecipientAddress, isConnected, usingCorrectChain]
-            .with([true, P.boolean, false, P.boolean], () => (
+            // [isMounted, isConnected, usingCorrectChain]
+            .with([true, false, P.boolean], () => (
               <Alert variant="destructive">
                 <AlertCircle className="h-4 w-4" />
                 <AlertTitle>Ethereum Wallet is required</AlertTitle>

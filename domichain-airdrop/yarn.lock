@@ -3307,6 +3307,7 @@ __metadata:
     eslint-config-next: 13.4.8
     lucide-react: ^0.258.0
     next: 13.4.8
+    next-usequerystate: ^1.7.3
     postcss: 8.4.24
     react: 18.2.0
     react-dom: 18.2.0
@@ -5437,6 +5438,17 @@ __metadata:
   version: 0.6.3
   resolution: "negotiator@npm:0.6.3"
   checksum: b8ffeb1e262eff7968fc90a2b6767b04cfd9842582a9d0ece0af7049537266e7b2506dfb1d107a32f06dd849ab2aea834d5830f7f4d0e5cb7d36e1ae55d021d9
+  languageName: node
+  linkType: hard
+
+"next-usequerystate@npm:^1.7.3":
+  version: 1.7.3
+  resolution: "next-usequerystate@npm:1.7.3"
+  peerDependencies:
+    next: "*"
+    react: "*"
+    react-dom: "*"
+  checksum: 68e49392b9ab2589510daa30718db239dee30b241ac4452d10408397cd3118db7eb00adba5d2edc09eb2fd90999f0065f85ed5fabb0f73ce22d4b76189c41541
   languageName: node
   linkType: hard
 

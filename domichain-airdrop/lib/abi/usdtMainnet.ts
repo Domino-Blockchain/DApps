@@ -1,7 +1,7 @@
-export const usdtTestnetContractAddress =
-  "0x337610d27c682E347C9cD60BD4b3b107C9d34dDd";
+export const usdtMainnetContractAddress =
+  "0x0a70dDf7cDBa3E8b6277C9DDcAf2185e8B6f539f";
 
-export const usdtTestnetABI = [
+export const usdtMainnetABI = [
   {
     name: "transfer",
     type: "function",
@@ -9,22 +9,16 @@ export const usdtTestnetABI = [
     inputs: [
       {
         internalType: "address",
-        name: "recipient",
+        name: "_to",
         type: "address",
       },
       {
         internalType: "uint256",
-        name: "amount",
+        name: "_value",
         type: "uint256",
       },
     ],
-    outputs: [
-      {
-        internalType: "bool",
-        name: "",
-        type: "bool",
-      },
-    ],
+    outputs: [],
     payable: false,
     stateMutability: "nonpayable",
   },

@@ -3,6 +3,10 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
+  usdtMainnetABI,
+  usdtMainnetContractAddress,
+} from "@/lib/abi/usdtMainnet";
+import {
   usdtTestnetABI,
   usdtTestnetContractAddress,
 } from "@/lib/abi/usdtTestnet";
@@ -32,6 +36,8 @@ import {
   useWaitForTransaction,
 } from "wagmi";
 
+const useTestnetContract = Boolean(process.env.NEXT_PUBLIC_USE_TESTNET);
+
 export default function Page() {
   const isMounted = useIsMounted();
 
@@ -53,8 +59,11 @@ export default function Page() {
     `${recipientAddress?.slice(0, 4)}...${recipientAddress?.slice(-4)}`;
 
   const preparedUsdtContractWrite = usePrepareContractWrite({
-    abi: usdtTestnetABI,
-    address: usdtTestnetContractAddress,
+    // @ts-expect-error
+    abi: useTestnetContract ? usdtTestnetABI : usdtMainnetABI,
+    address: useTestnetContract
+      ? usdtTestnetContractAddress
+      : usdtMainnetContractAddress,
     functionName: "transfer",
     args: [
       process.env.NEXT_PUBLIC_USDT_RECIPIENT_ADDRESS as never,
